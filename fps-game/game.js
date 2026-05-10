@@ -2016,6 +2016,19 @@ loadingEl.classList.add("hidden");
 let last = performance.now() / 1000;
 
 function update(dt, now) {
+  // Transients (tracers, impact sparks, explosions, muzzle flashes) animate
+  // independently of player.alive / gameState so visual effects from the
+  // lethal shot — and from the moments after the game ends — finish naturally
+  // instead of freezing in place. The list is empty outside combat, so this
+  // is a no-op during menu/idle.
+  for (const t of transient) t.update(dt);
+  for (let i = transient.length - 1; i >= 0; i--) {
+    if (!transient[i].alive) {
+      transient[i].dispose();
+      transient.splice(i, 1);
+    }
+  }
+
   if (gameState !== "playing") return;
   if (!player.alive) return;
 
@@ -2106,15 +2119,6 @@ function update(dt, now) {
 
   // Enemy AI
   updateEnemy(dt, now);
-
-  // Transients
-  for (const t of transient) t.update(dt);
-  for (let i = transient.length - 1; i >= 0; i--) {
-    if (!transient[i].alive) {
-      transient[i].dispose();
-      transient.splice(i, 1);
-    }
-  }
 
   // Shield slow regen (only when not recently hurt)
   if (player.shield < PLAYER_MAX_SHIELD) {
