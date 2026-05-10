@@ -1294,11 +1294,18 @@ function spawnExplosion(point, color = 0xff7e3b) {
 const keys = Object.create(null);
 
 window.addEventListener("keydown", (e) => {
+  // Ignore auto-repeat so holding F doesn't fire-spam between frames; the
+  // continuous-fire path in update() handles holds at a clean cadence.
+  if (e.repeat) return;
   keys[e.code] = true;
   if (e.code === "KeyR") tryReload();
   // Q toggles ADS — useful when LMB+RMB chord doesn't work on a given mouse/trackpad
   if (e.code === "KeyQ" && controls.isLocked && player.alive) {
     player.adsToggle = !player.adsToggle;
+  }
+  // F = fire (alternative to LMB; works fine while scoped because no mouse-button chord is needed)
+  if (e.code === "KeyF" && controls.isLocked && player.alive) {
+    tryFire();
   }
   if (e.code === "Escape") {
     // PointerLockControls handles unlocking; don't preventDefault
@@ -2190,8 +2197,8 @@ function update(dt, now) {
     finishReload();
   }
 
-  // Continuous fire
-  if (mouseDown && controls.isLocked) tryFire();
+  // Continuous fire — LMB held OR F held (F works while scoped without mouse-chord)
+  if ((mouseDown || keys["KeyF"]) && controls.isLocked) tryFire();
 
   // Movement (no sprint while scoped — your character braces the rifle)
   const obj = controls.getObject();
