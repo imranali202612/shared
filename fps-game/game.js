@@ -478,13 +478,74 @@ function buildWeaponRig() {
   muzzle.position.set(0, 0.02, -0.72);
   grp.add(muzzle);
 
-  const sight = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, 0.12), darkMat);
-  sight.position.set(0, 0.13, -0.05);
-  grp.add(sight);
+  // Picatinny-style mounting rail along the top of the receiver
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.025, 0.32), darkMat);
+  rail.position.set(0, 0.105, -0.08);
+  grp.add(rail);
 
-  const sightDot = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 8), accentMat);
-  sightDot.position.set(0, 0.16, -0.12);
-  grp.add(sightDot);
+  // ---- Scope (mounted on the rail) ----
+  const scopeMat = new THREE.MeshStandardMaterial({
+    color: 0x141a28,
+    roughness: 0.32,
+    metalness: 0.92,
+  });
+  // Two ring mounts that clamp the tube to the rail
+  for (const z of [-0.18, 0.02]) {
+    const ring = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.052, 0.052, 0.025, 16, 1, true),
+      scopeMat
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.set(0, 0.155, z);
+    grp.add(ring);
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.04, 0.025), scopeMat);
+    post.position.set(0, 0.13, z);
+    grp.add(post);
+  }
+  // Main scope tube
+  const scopeTube = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.045, 0.045, 0.32, 18),
+    scopeMat
+  );
+  scopeTube.rotation.x = Math.PI / 2;
+  scopeTube.position.set(0, 0.155, -0.08);
+  grp.add(scopeTube);
+  // Eyepiece flare (back, toward player)
+  const eyepiece = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.058, 0.046, 0.05, 18),
+    scopeMat
+  );
+  eyepiece.rotation.x = Math.PI / 2;
+  eyepiece.position.set(0, 0.155, 0.085);
+  grp.add(eyepiece);
+  // Objective bell (front)
+  const objective = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.06, 0.05, 0.07, 18),
+    scopeMat
+  );
+  objective.rotation.x = Math.PI / 2;
+  objective.position.set(0, 0.155, -0.225);
+  grp.add(objective);
+  // Glowing front lens (front of objective bell)
+  const lensMat = new THREE.MeshBasicMaterial({
+    color: 0x6cf2ff,
+    transparent: true,
+    opacity: 0.85,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const lens = new THREE.Mesh(new THREE.CircleGeometry(0.05, 18), lensMat);
+  lens.position.set(0, 0.155, -0.262);
+  // CircleGeometry's normal points along +Z; rotate so the lit face points forward (-Z)
+  lens.rotation.y = Math.PI;
+  grp.add(lens);
+  // Tiny windage/elevation turret on top
+  const turret = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.02, 0.022, 0.04, 12),
+    scopeMat
+  );
+  turret.position.set(0, 0.21, -0.08);
+  grp.add(turret);
 
   const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.22, 0.12), bodyMat);
   grip.position.set(0, -0.18, 0.05);
@@ -1047,7 +1108,29 @@ const player = {
   startTime: 0,
   alive: true,
   dead: false,
+  // Aim-down-sights — two independent input sources combined every frame:
+  //   adsHold:   RMB currently held (live mouse-button state)
+  //   adsToggle: KeyQ toggle (sticky on/off, useful when chord-clicking fails)
+  // Effective state is `ads = adsHold || adsToggle`.
+  adsHold: false,
+  adsToggle: false,
+  ads: false, // computed each frame
+  adsT: 0,    // 0 = hipfire, 1 = fully scoped (smoothly tweened)
 };
+
+// Aim-down-sights tuning constants (eased into when RMB is held)
+const ADS = {
+  baseFov: 78,
+  zoomFov: 36,         // 78 / 36 ≈ 2.17× true zoom
+  spreadMult: 0.05,    // weapon spread is nearly perfect when scoped
+  speedMult: 0.55,     // slower walk while scoped
+  pointerMult: 0.45,   // mouse sensitivity multiplier when scoped (finer aim)
+  lerpRate: 14,        // higher = snappier scope-in/out
+  showThreshold: 0.6,  // adsT above this hides the gun model and shows the overlay
+};
+// Cache the scope DOM elements once (hudEl is declared near the top of the file)
+const scopeOverlay = $("#scope-overlay");
+const _basePointerSpeed = (typeof controls.pointerSpeed === "number") ? controls.pointerSpeed : 1.0;
 
 let enemy = new Enemy();
 
@@ -1213,20 +1296,43 @@ const keys = Object.create(null);
 window.addEventListener("keydown", (e) => {
   keys[e.code] = true;
   if (e.code === "KeyR") tryReload();
+  // Q toggles ADS — useful when LMB+RMB chord doesn't work on a given mouse/trackpad
+  if (e.code === "KeyQ" && controls.isLocked && player.alive) {
+    player.adsToggle = !player.adsToggle;
+  }
   if (e.code === "Escape") {
     // PointerLockControls handles unlocking; don't preventDefault
   }
 });
 window.addEventListener("keyup", (e) => { keys[e.code] = false; });
 
-document.addEventListener("mousedown", (e) => {
-  if (e.button === 0 && controls.isLocked) tryFire();
-});
+// ----- Mouse input -----
+// We derive button state from `e.buttons` (a bitmask of *every currently-held*
+// button: 1 = LMB, 2 = RMB, 4 = MMB). This is more reliable than tracking
+// `mousedown`/`mouseup` for individual buttons because:
+//   • Many mice/trackpads don't fire LMB-mousedown while RMB is held (or
+//     vice-versa) — the so-called "button chord" hardware limitation.
+//   • If a mousedown or mouseup is ever missed (window blur, focus change),
+//     the *next* mousemove (which fires constantly in pointer-locked FPS)
+//     resyncs us. So we can never get stuck in a wrong state.
+let mouseDown = false; // LMB currently held (used by continuous-fire path)
 
-// Continuous fire while held
-let mouseDown = false;
-document.addEventListener("mousedown", (e) => { if (e.button === 0) mouseDown = true; });
-document.addEventListener("mouseup", (e) => { if (e.button === 0) mouseDown = false; });
+function syncMouseButtons(e) {
+  const lmb = (e.buttons & 1) === 1;
+  const rmb = (e.buttons & 2) === 2;
+  // Edge-detect LMB rising → fire immediately (don't wait for the next frame)
+  if (lmb && !mouseDown && controls.isLocked && player.alive) tryFire();
+  mouseDown = lmb;
+  // ADS hold — RMB held = scoped (combined with KeyQ toggle in the update loop)
+  player.adsHold = rmb && controls.isLocked && player.alive;
+}
+// `capture: true` so we update state before any other handler (and even if
+// another handler later calls stopPropagation, our state is already correct).
+document.addEventListener("mousedown", syncMouseButtons, { capture: true });
+document.addEventListener("mouseup",   syncMouseButtons, { capture: true });
+document.addEventListener("mousemove", syncMouseButtons, { capture: true });
+// Block the browser context menu so RMB can be used as a game input
+document.addEventListener("contextmenu", (e) => e.preventDefault());
 
 controls.addEventListener("lock", () => {
   pauseEl.classList.add("hidden");
@@ -1333,11 +1439,12 @@ function tryFire() {
   weapon.group.position.z += 0.03;
   weapon.group.rotation.x -= 0.04;
 
-  // Aim direction with slight spread
+  // Aim direction with slight spread (ADS dramatically tightens it)
   const dirV = new THREE.Vector3();
   camera.getWorldDirection(dirV);
-  dirV.x += (Math.random() - 0.5) * WEAPON_SPREAD * 60;
-  dirV.y += (Math.random() - 0.5) * WEAPON_SPREAD * 60;
+  const spreadMult = 1 - (1 - ADS.spreadMult) * player.adsT;
+  dirV.x += (Math.random() - 0.5) * WEAPON_SPREAD * 60 * spreadMult;
+  dirV.y += (Math.random() - 0.5) * WEAPON_SPREAD * 60 * spreadMult;
   dirV.normalize();
 
   const origin = camera.getWorldPosition(new THREE.Vector3());
@@ -1975,6 +2082,18 @@ function endGame(victory) {
   gameState = "ended";
   controls.unlock();
   pauseEl.classList.add("hidden");
+  // Snap scope back so the end-screen and menu render at the normal FOV
+  player.adsHold = false;
+  player.adsToggle = false;
+  player.ads = false;
+  player.adsT = 0;
+  mouseDown = false;
+  camera.fov = ADS.baseFov;
+  camera.updateProjectionMatrix();
+  if ("pointerSpeed" in controls) controls.pointerSpeed = _basePointerSpeed;
+  weapon.group.visible = true;
+  scopeOverlay.classList.remove("show");
+  if (hudEl) hudEl.classList.remove("scoped");
 
   const elapsed = performance.now() / 1000 - player.startTime;
   const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
@@ -2040,6 +2159,30 @@ function update(dt, now) {
   }
 
   if (gameState !== "playing") return;
+
+  // ADS (right-click hold OR Q toggle) smooth transition — runs even when
+  // dead/reloading so the scope cleanly retracts in those cases.
+  player.ads = player.adsHold || player.adsToggle;
+  const adsActive =
+    player.ads && player.alive && !player.reloading && controls.isLocked;
+  // Reloading auto-cancels the Q-toggle so the scope retracts to reload
+  if (player.reloading && player.adsToggle) player.adsToggle = false;
+  const adsTarget = adsActive ? 1 : 0;
+  player.adsT += (adsTarget - player.adsT) * Math.min(1, dt * ADS.lerpRate);
+  if (player.adsT < 0.001) player.adsT = 0;
+  if (player.adsT > 0.999) player.adsT = 1;
+  // Apply ADS effects (FOV zoom + slower mouse + show/hide scope overlay & gun)
+  camera.fov = ADS.baseFov + (ADS.zoomFov - ADS.baseFov) * player.adsT;
+  camera.updateProjectionMatrix();
+  if ("pointerSpeed" in controls) {
+    controls.pointerSpeed = _basePointerSpeed *
+      (1 - (1 - ADS.pointerMult) * player.adsT);
+  }
+  const showScope = player.adsT > ADS.showThreshold;
+  weapon.group.visible = !showScope;
+  scopeOverlay.classList.toggle("show", showScope);
+  if (hudEl) hudEl.classList.toggle("scoped", showScope);
+
   if (!player.alive) return;
 
   // Reload progression
@@ -2050,9 +2193,11 @@ function update(dt, now) {
   // Continuous fire
   if (mouseDown && controls.isLocked) tryFire();
 
-  // Movement
+  // Movement (no sprint while scoped — your character braces the rifle)
   const obj = controls.getObject();
-  const speed = (keys["ShiftLeft"] || keys["ShiftRight"] ? SPRINT_MULT : 1) * WALK_SPEED;
+  const sprinting = (keys["ShiftLeft"] || keys["ShiftRight"]) && player.adsT < 0.2;
+  const adsSpeedMult = 1 - (1 - ADS.speedMult) * player.adsT;
+  const speed = (sprinting ? SPRINT_MULT : 1) * WALK_SPEED * adsSpeedMult;
 
   // Build movement vector in camera-aligned space
   const forward = new THREE.Vector3();

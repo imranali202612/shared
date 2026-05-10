@@ -968,6 +968,119 @@ body,
   }
 }
 
+/* ==================== Sniper scope overlay (ADS) ==================== */
+#scope-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 16;
+  opacity: 0;
+  transition: opacity 0.08s linear;
+}
+
+#scope-overlay.show {
+  opacity: 1;
+}
+
+/* Black mask with a clear circular "lens" cut through the middle */
+.scope-mask {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at center,
+    rgba(0, 0, 0, 0) 0,
+    rgba(0, 0, 0, 0) 39vmin,
+    rgba(0, 0, 0, 0.55) 39.5vmin,
+    rgba(0, 0, 0, 0.98) 41vmin,
+    #000 100%
+  );
+}
+
+/* Subtle inner glass-edge highlight around the lens */
+.scope-mask::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 80vmin;
+  height: 80vmin;
+  margin-left: -40vmin;
+  margin-top: -40vmin;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 2px rgba(20, 240, 255, 0.55),
+    inset 0 0 24px rgba(20, 240, 255, 0.25),
+    0 0 18px rgba(20, 240, 255, 0.4);
+  pointer-events: none;
+}
+
+.scope-reticle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 80vmin;
+  height: 80vmin;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.scope-reticle .ring-outer {
+  fill: none;
+  stroke: rgba(20, 240, 255, 0.55);
+  stroke-width: 0.6;
+}
+
+.scope-reticle .ring-inner {
+  fill: none;
+  stroke: rgba(20, 240, 255, 0.3);
+  stroke-width: 0.35;
+  stroke-dasharray: 2 3;
+}
+
+.scope-reticle .cross {
+  stroke: rgba(0, 0, 0, 0.85);
+  stroke-width: 0.7;
+}
+
+.scope-reticle .mil {
+  stroke: rgba(0, 0, 0, 0.7);
+  stroke-width: 0.5;
+}
+
+.scope-reticle .dot {
+  fill: var(--neon-red);
+  filter: drop-shadow(0 0 1.5px rgba(255, 59, 92, 0.9));
+}
+
+.scope-zoom {
+  position: absolute;
+  left: 50%;
+  bottom: calc(50% - 38vmin);
+  transform: translateX(-50%);
+  font-family: "Rajdhani", "Orbitron", "Inter", system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 6px rgba(20, 240, 255, 0.7);
+}
+
+.scope-hint {
+  position: absolute;
+  left: 50%;
+  top: calc(50% - 38vmin - 28px);
+  transform: translateX(-50%);
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: uppercase;
+}
+
+/* Hide the regular HUD crosshair while the scope is showing */
+#hud.scoped #crosshair {
+  display: none;
+}
+
 .kill-row {
   background: rgba(8, 11, 22, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.1);
