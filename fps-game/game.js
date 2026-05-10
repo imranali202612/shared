@@ -1293,9 +1293,14 @@ function spawnExplosion(point, color = 0xff7e3b) {
 // ---------- Input ----------
 const keys = Object.create(null);
 
+// Set of keys that act as a "fire" button (any of these works the same way:
+// tap = one shot, hold = continuous fire). Adding more aliases here makes it
+// trivial to expand later without touching the firing logic.
+const FIRE_KEYS = new Set(["KeyF", "KeyE"]);
+
 window.addEventListener("keydown", (e) => {
-  // Ignore auto-repeat so holding F doesn't fire-spam between frames; the
-  // continuous-fire path in update() handles holds at a clean cadence.
+  // Ignore auto-repeat so holding a fire key doesn't fire-spam between frames;
+  // the continuous-fire path in update() handles holds at a clean cadence.
   if (e.repeat) return;
   keys[e.code] = true;
   if (e.code === "KeyR") tryReload();
@@ -1303,8 +1308,9 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "KeyQ" && controls.isLocked && player.alive) {
     player.adsToggle = !player.adsToggle;
   }
-  // F = fire (alternative to LMB; works fine while scoped because no mouse-button chord is needed)
-  if (e.code === "KeyF" && controls.isLocked && player.alive) {
+  // F or E = fire (alternative to LMB; both work fine while scoped because no
+  // mouse-button chord is needed).
+  if (FIRE_KEYS.has(e.code) && controls.isLocked && player.alive) {
     tryFire();
   }
   if (e.code === "Escape") {
@@ -2197,8 +2203,11 @@ function update(dt, now) {
     finishReload();
   }
 
-  // Continuous fire — LMB held OR F held (F works while scoped without mouse-chord)
-  if ((mouseDown || keys["KeyF"]) && controls.isLocked) tryFire();
+  // Continuous fire — LMB held OR any FIRE_KEYS held (F/E work while scoped
+  // without needing a mouse-button chord).
+  let fireKeyHeld = false;
+  for (const k of FIRE_KEYS) { if (keys[k]) { fireKeyHeld = true; break; } }
+  if ((mouseDown || fireKeyHeld) && controls.isLocked) tryFire();
 
   // Movement (no sprint while scoped — your character braces the rifle)
   const obj = controls.getObject();
