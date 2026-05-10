@@ -92,13 +92,14 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 1.55;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x05070d);
-scene.fog = new THREE.Fog(0x0a0e1c, 25, 90);
+scene.background = new THREE.Color(0x131a2c);
+// Fog kept very subtle so the entire arena reads clearly
+scene.fog = new THREE.Fog(0x1d2848, 70, 220);
 
 const camera = new THREE.PerspectiveCamera(
   78,
@@ -228,14 +229,14 @@ const audio = (() => {
   };
 })();
 
-// ---------- Lighting (brighter & clearer) ----------
-const ambient = new THREE.AmbientLight(0x334466, 0.65);
+// ---------- Lighting (much brighter, easy to see the whole arena) ----------
+const ambient = new THREE.AmbientLight(0x6b85b3, 1.1);
 scene.add(ambient);
 
-const hemi = new THREE.HemisphereLight(0xa0c0ff, 0x221033, 0.85);
+const hemi = new THREE.HemisphereLight(0xc4dcff, 0x322048, 1.6);
 scene.add(hemi);
 
-const dir = new THREE.DirectionalLight(0xd8e6ff, 1.1);
+const dir = new THREE.DirectionalLight(0xeef4ff, 1.8);
 dir.position.set(30, 60, 25);
 dir.castShadow = true;
 dir.shadow.mapSize.set(2048, 2048);
@@ -249,12 +250,12 @@ dir.shadow.bias = -0.0005;
 dir.shadow.normalBias = 0.04;
 scene.add(dir);
 
-// A second softer fill light from the opposite side to remove harsh black shadows
-const fill = new THREE.DirectionalLight(0xff77b3, 0.35);
+// A second fill light from the opposite side to remove harsh black shadows
+const fill = new THREE.DirectionalLight(0xffa2c8, 0.7);
 fill.position.set(-30, 35, -25);
 scene.add(fill);
 
-// Neon corner accent lights — brighter, larger reach
+// Neon corner accent lights — much brighter, full-arena reach
 const corners = [
   [ARENA_SIZE - 4, 7, ARENA_SIZE - 4, 0x14f0ff],
   [-ARENA_SIZE + 4, 7, -ARENA_SIZE + 4, 0xff2bd6],
@@ -262,17 +263,26 @@ const corners = [
   [-ARENA_SIZE + 4, 7, ARENA_SIZE - 4, 0x1eff8b],
 ];
 for (const [x, y, z, col] of corners) {
-  const pl = new THREE.PointLight(col, 2.4, 80, 1.6);
+  // Higher intensity, 1.0 decay (instead of 1.6) and bigger range so light reaches the middle
+  const pl = new THREE.PointLight(col, 3.2, 130, 1.0);
   pl.position.set(x, y, z);
   scene.add(pl);
 }
 
-// Center overhead spotlight to define the arena focal point
-const centerSpot = new THREE.SpotLight(0xffffff, 1.8, 60, Math.PI / 5, 0.5, 1.4);
+// Center overhead spotlight to define the arena focal point (brighter)
+const centerSpot = new THREE.SpotLight(0xffffff, 3.0, 80, Math.PI / 4, 0.45, 1.0);
 centerSpot.position.set(0, WALL_HEIGHT - 0.2, 0);
 centerSpot.target.position.set(0, 0, 0);
 scene.add(centerSpot);
 scene.add(centerSpot.target);
+
+// Two extra mid-arena overhead lights to brighten the play space
+const midLightA = new THREE.PointLight(0xbfd6ff, 1.4, 60, 1.0);
+midLightA.position.set(-ARENA_SIZE / 2, WALL_HEIGHT - 0.5, 0);
+scene.add(midLightA);
+const midLightB = new THREE.PointLight(0xbfd6ff, 1.4, 60, 1.0);
+midLightB.position.set(ARENA_SIZE / 2, WALL_HEIGHT - 0.5, 0);
+scene.add(midLightB);
 
 // ---------- Arena Geometry ----------
 const collidables = []; // { box: THREE.Box3, mesh: Object3D, kind: 'wall'|'pillar' }
@@ -283,11 +293,11 @@ function makeFloor() {
   const c = document.createElement("canvas");
   c.width = c.height = 512;
   const ctx = c.getContext("2d");
-  ctx.fillStyle = "#0a0e1c";
+  ctx.fillStyle = "#1c2540";
   ctx.fillRect(0, 0, 512, 512);
   // Grid lines
-  ctx.strokeStyle = "#14f0ff";
-  ctx.globalAlpha = 0.18;
+  ctx.strokeStyle = "#5aeaff";
+  ctx.globalAlpha = 0.32;
   ctx.lineWidth = 1.2;
   for (let i = 0; i <= 512; i += 32) {
     ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 512); ctx.stroke();
@@ -313,9 +323,9 @@ function makeFloor() {
 
   const mat = new THREE.MeshStandardMaterial({
     map: tex,
-    roughness: 0.9,
-    metalness: 0.1,
-    color: 0x6a7da8,
+    roughness: 0.75,
+    metalness: 0.15,
+    color: 0xa8bcdf,
   });
   const geo = new THREE.PlaneGeometry(size, size);
   const m = new THREE.Mesh(geo, mat);
@@ -327,7 +337,7 @@ function makeFloor() {
 function makeCeiling() {
   const size = ARENA_SIZE * 2;
   const mat = new THREE.MeshStandardMaterial({
-    color: 0x0a0d18,
+    color: 0x1f2742,
     roughness: 0.8,
     metalness: 0.2,
   });
@@ -337,7 +347,7 @@ function makeCeiling() {
   scene.add(m);
 }
 
-function makeWall(x, z, w, h, d, color = 0x1a2238) {
+function makeWall(x, z, w, h, d, color = 0x3a4670) {
   const mat = new THREE.MeshStandardMaterial({
     color,
     roughness: 0.6,
@@ -371,9 +381,9 @@ function makeArenaWalls() {
 
 function makePillar(x, z, h = 5, w = 3) {
   const mat = new THREE.MeshStandardMaterial({
-    color: 0x22304d,
-    roughness: 0.55,
-    metalness: 0.4,
+    color: 0x44567c,
+    roughness: 0.5,
+    metalness: 0.45,
   });
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), mat);
   m.position.set(x, h / 2, z);
@@ -396,9 +406,9 @@ function makePillar(x, z, h = 5, w = 3) {
 function makeRamp(x, z, w = 6, h = 1.2, d = 4, rotY = 0) {
   // Low cover crate (no real ramp logic — just a box low enough to walk around)
   const mat = new THREE.MeshStandardMaterial({
-    color: 0x2a3856,
-    roughness: 0.7,
-    metalness: 0.2,
+    color: 0x4c5f87,
+    roughness: 0.65,
+    metalness: 0.25,
   });
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
   m.position.set(x, h / 2, z);
