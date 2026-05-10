@@ -1,0 +1,12 @@
+- generic [ref=e5]:
+  - heading "NEON ARENA" [level=1] [ref=e6]
+  - paragraph [ref=e7]: A 1-vs-1 first-person showdown against the Sentinel.
+  - generic [ref=e8]:
+    - generic [ref=e9]: DIFFICULTY
+    - generic [ref=e10]:
+      - button "EASY" [ref=e11] [cursor=pointer]
+      - button "NORMAL" [ref=e12] [cursor=pointer]
+      - button "HARD" [ref=e13] [cursor=pointer]
+  - button "ENTER ARENA" [ref=e14] [cursor=pointer]
+  - button "HOW TO PLAY" [ref=e15] [cursor=pointer]
+  - generic [ref=e16]: Built with Three.js · works fully offline once loaded
