@@ -964,8 +964,8 @@ class Enemy {
 
   hitbox() {
     return new THREE.Box3().setFromCenterAndSize(
-      new THREE.Vector3(this.group.position.x, this.group.position.y + 1.15, this.group.position.z),
-      new THREE.Vector3(1.0, 2.2, 0.8)
+      new THREE.Vector3(this.group.position.x, this.group.position.y + 1.3, this.group.position.z),
+      new THREE.Vector3(1.3, 2.5, 0.95)
     );
   }
 
@@ -983,8 +983,9 @@ class Enemy {
   die() {
     this.dead = true;
     audio.explode();
-    // Particle burst
-    spawnExplosion(this.group.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 0xff2bd6);
+    // Two-stage particle burst: red core blast + amber shrapnel
+    spawnExplosion(this.group.position.clone().add(new THREE.Vector3(0, 1.65, 0.3)), 0xff1a3a);
+    spawnExplosion(this.group.position.clone().add(new THREE.Vector3(0, 1.4, 0)), 0xff7e3b);
     // Hide enemy
     this.group.visible = false;
   }
@@ -1476,18 +1477,45 @@ function updateEnemy(dt, now) {
   resolveEnemyCollisions(newPos);
   enemy.group.position.copy(newPos);
 
-  // Leg & arm bob
+  // Leg & arm bob (legs swing alternately, off-hand counter-swings)
   const moving = (Math.abs(enemy.velocity.x) + Math.abs(enemy.velocity.z)) > 0.5;
   if (moving) {
-    const bob = Math.sin(now * 8) * 0.3;
+    const bob = Math.sin(now * 8) * 0.45;
     enemy.lLeg.rotation.x = bob;
     enemy.rLeg.rotation.x = -bob;
-    enemy.rArm.rotation.x = -bob * 0.6;
+    enemy.lArm.rotation.x = -bob * 0.8;
+    enemy.rArm.rotation.x = bob * 0.4;
   } else {
     enemy.lLeg.rotation.x *= 0.85;
     enemy.rLeg.rotation.x *= 0.85;
+    enemy.lArm.rotation.x *= 0.85;
     enemy.rArm.rotation.x *= 0.85;
   }
+
+  // ---- Idle / "alive" pulses ----
+  // Reactor core breathes; eyes flicker brighter when player is in sight
+  const seePulse = (seesPlayer ? 1.6 : 1.0);
+  const corePulse = 0.85 + Math.sin(now * 4.5) * 0.2;
+  enemy.core.scale.setScalar(corePulse);
+  enemy.core.material.color.setRGB(1.0, 0.32 * (2 - corePulse), 0.12 * (2 - corePulse));
+  enemy.halo.scale.setScalar(1.0 + Math.sin(now * 4.5) * 0.15);
+  enemy.halo.material.opacity = 0.35 + Math.sin(now * 4.5) * 0.18;
+  // Eyes: stay red, but get brighter and slightly bigger when player is visible
+  const eyeScale = 1.0 + Math.sin(now * 6) * 0.08 * seePulse;
+  enemy.eyeL.scale.setScalar(eyeScale * (seesPlayer ? 1.25 : 1));
+  enemy.eyeR.scale.setScalar(eyeScale * (seesPlayer ? 1.25 : 1));
+  // Antenna beacon strobes
+  const beaconOn = (Math.sin(now * 3) > 0.6) ? 1 : 0.25;
+  enemy.beacon.material.color.setRGB(1, 0.5 * beaconOn, 0.2 * beaconOn);
+  // Thrusters flare when moving
+  const flare = moving ? 0.85 + Math.random() * 0.15 : 0.35 + Math.sin(now * 12) * 0.1;
+  enemy.thrusterFL.material.opacity = flare;
+  enemy.thrusterFR.material.opacity = flare;
+  enemy.thrusterFL.scale.setScalar(0.8 + flare * 0.6);
+  enemy.thrusterFR.scale.setScalar(0.8 + flare * 0.6);
+  enemy.thrusterLight.intensity = moving ? 1.2 : 0.5;
+  // Chest light pulses with core
+  enemy.chestLight.intensity = 1.1 + Math.sin(now * 4.5) * 0.4 + (seesPlayer ? 0.4 : 0);
 
   // Aim error refresh
   enemy.aimErrorT -= dt;
