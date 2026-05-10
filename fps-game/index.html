@@ -31,6 +31,24 @@
 
         <div id="hit-marker"></div>
         <div id="damage-vignette"></div>
+        <div id="lowhp-pulse"></div>
+
+        <!-- Off-screen enemy arrow (rotates around screen center) -->
+        <div id="enemy-arrow" class="hidden">
+          <div class="arrow-icon"></div>
+          <div class="arrow-dist">--m</div>
+        </div>
+
+        <!-- Directional damage wedges (4 directions: up/down/left/right) -->
+        <div id="dmg-dir">
+          <div class="dmg-wedge dmg-up"></div>
+          <div class="dmg-wedge dmg-right"></div>
+          <div class="dmg-wedge dmg-down"></div>
+          <div class="dmg-wedge dmg-left"></div>
+        </div>
+
+        <!-- Floating damage numbers (we append spans here) -->
+        <div id="damage-numbers"></div>
 
         <div id="hud-bottom-left">
           <div class="stat">
@@ -46,10 +64,17 @@
         </div>
 
         <div id="hud-bottom-right">
-          <div id="ammo">
-            <div id="ammo-mag">12</div>
-            <div id="ammo-sep">/</div>
-            <div id="ammo-reserve">48</div>
+          <div id="ammo-block">
+            <!-- Reload ring (SVG) sits behind the ammo numbers -->
+            <svg id="reload-ring" viewBox="0 0 64 64" aria-hidden="true">
+              <circle class="ring-bg" cx="32" cy="32" r="28" />
+              <circle id="reload-ring-fill" class="ring-fill" cx="32" cy="32" r="28" />
+            </svg>
+            <div id="ammo">
+              <div id="ammo-mag">12</div>
+              <div id="ammo-sep">/</div>
+              <div id="ammo-reserve">48</div>
+            </div>
           </div>
           <div id="weapon-name">PLASMA RIFLE</div>
           <div id="reload-hint" class="hidden">RELOADING…</div>
@@ -64,6 +89,22 @@
           <div class="hud-top-card">
             <div class="hud-top-label" id="enemy-name">SENTINEL-X</div>
             <div class="bar small"><div id="enemy-bar" class="bar-fill enemy"></div></div>
+          </div>
+          <!-- Distance + sight indicator -->
+          <div id="dist-card">
+            <div class="dist-label">DIST</div>
+            <div class="dist-value"><span id="dist-text">--</span><span class="dist-unit">m</span></div>
+            <div class="dist-los" id="dist-los">NO SIGHT</div>
+          </div>
+        </div>
+
+        <!-- Minimap (top-right) -->
+        <div id="minimap-wrap">
+          <div class="minimap-label">RADAR</div>
+          <canvas id="minimap" width="180" height="180"></canvas>
+          <div class="minimap-legend">
+            <span><i class="dot you"></i>YOU</span>
+            <span><i class="dot foe"></i>SENTINEL</span>
           </div>
         </div>
 

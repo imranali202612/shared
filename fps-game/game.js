@@ -27,11 +27,11 @@ const WEAPON_SPREAD = 0.0035;   // small inaccuracy
 const PLAYER_MAX_HP = 100;
 const PLAYER_MAX_SHIELD = 50;
 
-// Difficulty presets
+// Difficulty presets — bumped harder (more dmg, faster fire, sharper aim, snappier reaction, more HP)
 const DIFFICULTY = {
-  easy:   { aimErr: 0.07, fireRate: 1.1, dmg: 8,  reactT: 0.55, hp: 110 },
-  normal: { aimErr: 0.04, fireRate: 0.7, dmg: 12, reactT: 0.32, hp: 140 },
-  hard:   { aimErr: 0.02, fireRate: 0.45,dmg: 16, reactT: 0.18, hp: 180 },
+  easy:   { aimErr: 0.05,  fireRate: 0.85, dmg: 12, reactT: 0.45, hp: 130, speed: 1.0 },
+  normal: { aimErr: 0.025, fireRate: 0.50, dmg: 18, reactT: 0.22, hp: 180, speed: 1.15 },
+  hard:   { aimErr: 0.012, fireRate: 0.32, dmg: 26, reactT: 0.10, hp: 240, speed: 1.35 },
 };
 
 // ---------- DOM ----------
@@ -65,6 +65,22 @@ const endSub = $("#end-sub");
 const endTime = $("#end-time");
 const endShots = $("#end-shots");
 const endAcc = $("#end-acc");
+// New HUD bits
+const minimap = $("#minimap");
+const minimapCtx = minimap ? minimap.getContext("2d") : null;
+const enemyArrow = $("#enemy-arrow");
+const enemyArrowDist = enemyArrow ? enemyArrow.querySelector(".arrow-dist") : null;
+const distText = $("#dist-text");
+const distLos = $("#dist-los");
+const dmgUp = $(".dmg-up");
+const dmgDown = $(".dmg-down");
+const dmgLeft = $(".dmg-left");
+const dmgRight = $(".dmg-right");
+const damageNumbers = $("#damage-numbers");
+const reloadRing = $("#reload-ring");
+const reloadRingFill = $("#reload-ring-fill");
+const lowhpPulse = $("#lowhp-pulse");
+const RING_CIRC = 175.93; // 2*pi*28 (matches stroke-dasharray in CSS)
 
 // ---------- Renderer / Scene ----------
 const renderer = new THREE.WebGLRenderer({
@@ -212,37 +228,51 @@ const audio = (() => {
   };
 })();
 
-// ---------- Lighting ----------
-const ambient = new THREE.AmbientLight(0x223355, 0.4);
+// ---------- Lighting (brighter & clearer) ----------
+const ambient = new THREE.AmbientLight(0x334466, 0.65);
 scene.add(ambient);
 
-const hemi = new THREE.HemisphereLight(0x88aaff, 0x110a22, 0.5);
+const hemi = new THREE.HemisphereLight(0xa0c0ff, 0x221033, 0.85);
 scene.add(hemi);
 
-const dir = new THREE.DirectionalLight(0xbfd6ff, 0.8);
-dir.position.set(30, 50, 20);
+const dir = new THREE.DirectionalLight(0xd8e6ff, 1.1);
+dir.position.set(30, 60, 25);
 dir.castShadow = true;
-dir.shadow.mapSize.set(1024, 1024);
+dir.shadow.mapSize.set(2048, 2048);
 dir.shadow.camera.left = -ARENA_SIZE;
 dir.shadow.camera.right = ARENA_SIZE;
 dir.shadow.camera.top = ARENA_SIZE;
 dir.shadow.camera.bottom = -ARENA_SIZE;
 dir.shadow.camera.near = 1;
-dir.shadow.camera.far = 120;
+dir.shadow.camera.far = 150;
+dir.shadow.bias = -0.0005;
+dir.shadow.normalBias = 0.04;
 scene.add(dir);
 
-// Neon corner accent lights
+// A second softer fill light from the opposite side to remove harsh black shadows
+const fill = new THREE.DirectionalLight(0xff77b3, 0.35);
+fill.position.set(-30, 35, -25);
+scene.add(fill);
+
+// Neon corner accent lights — brighter, larger reach
 const corners = [
-  [ARENA_SIZE - 4, 6, ARENA_SIZE - 4, 0x14f0ff],
-  [-ARENA_SIZE + 4, 6, -ARENA_SIZE + 4, 0xff2bd6],
-  [ARENA_SIZE - 4, 6, -ARENA_SIZE + 4, 0x8a4bff],
-  [-ARENA_SIZE + 4, 6, ARENA_SIZE - 4, 0x1eff8b],
+  [ARENA_SIZE - 4, 7, ARENA_SIZE - 4, 0x14f0ff],
+  [-ARENA_SIZE + 4, 7, -ARENA_SIZE + 4, 0xff2bd6],
+  [ARENA_SIZE - 4, 7, -ARENA_SIZE + 4, 0x8a4bff],
+  [-ARENA_SIZE + 4, 7, ARENA_SIZE - 4, 0x1eff8b],
 ];
 for (const [x, y, z, col] of corners) {
-  const pl = new THREE.PointLight(col, 1.4, 60, 1.6);
+  const pl = new THREE.PointLight(col, 2.4, 80, 1.6);
   pl.position.set(x, y, z);
   scene.add(pl);
 }
+
+// Center overhead spotlight to define the arena focal point
+const centerSpot = new THREE.SpotLight(0xffffff, 1.8, 60, Math.PI / 5, 0.5, 1.4);
+centerSpot.position.set(0, WALL_HEIGHT - 0.2, 0);
+centerSpot.target.position.set(0, 0, 0);
+scene.add(centerSpot);
+scene.add(centerSpot.target);
 
 // ---------- Arena Geometry ----------
 const collidables = []; // { box: THREE.Box3, mesh: Object3D, kind: 'wall'|'pillar' }
@@ -1322,10 +1352,15 @@ function tryFire() {
         hitEnemy = true;
         hitNormal = new THREE.Vector3().subVectors(origin, hitPt).normalize();
         hitColor = 0xff2bd6;
-        const killed = enemy.takeDamage(WEAPON_DAMAGE);
+        // Crit if we hit near the chest core (approx y = enemy.y + 1.65)
+        const dyCore = Math.abs(hitPt.y - (enemy.group.position.y + 1.65));
+        const isCrit = dyCore < 0.35;
+        const dmg = isCrit ? Math.round(WEAPON_DAMAGE * 1.6) : WEAPON_DAMAGE;
+        const killed = enemy.takeDamage(dmg);
         player.shotsHit += 1;
         showHitMarker();
         audio.hit();
+        spawnDamageNumber(hitPt, dmg, { crit: isCrit });
         if (killed) {
           addKillRow(`<span class="me">YOU</span> eliminated <span class="them">${"SENTINEL-X"}</span>`);
           setTimeout(() => endGame(true), 600);
@@ -1466,9 +1501,9 @@ function updateEnemy(dt, now) {
   }
 
   if (desiredMove.lengthSq() > 0) desiredMove.normalize();
-  const speed = seesPlayer ? 5.5 : 3.6;
-  enemy.velocity.x = desiredMove.x * speed;
-  enemy.velocity.z = desiredMove.z * speed;
+  const baseSpeed = (seesPlayer ? 5.8 : 3.8) * (currentDifficulty.speed || 1);
+  enemy.velocity.x = desiredMove.x * baseSpeed;
+  enemy.velocity.z = desiredMove.z * baseSpeed;
 
   // Apply movement with collision
   const newPos = enemy.group.position.clone();
@@ -1580,19 +1615,22 @@ function enemyShoot(targetEye) {
 
   spawnTracer(muzzle, endPoint, 0xff2bd6);
   if (hitPlayer) {
-    damagePlayer(currentDifficulty.dmg);
+    damagePlayer(currentDifficulty.dmg, muzzle);
   } else if (wallHits.length > 0) {
     const n = wallHits[0].face.normal.clone().transformDirection(wallHits[0].object.matrixWorld);
     spawnImpact(endPoint, n, 0xff7e3b);
   }
 }
 
-function damagePlayer(amount) {
+function damagePlayer(amount, fromWorldPos) {
   if (!player.alive) return;
+  const totalAmount = amount;
   audio.hurt();
   showDamageVignette();
   // Camera shake
-  shakeAmount = Math.min(shakeAmount + 0.06, 0.18);
+  shakeAmount = Math.min(shakeAmount + 0.07, 0.22);
+  // Directional indicator (where the shot came from)
+  if (fromWorldPos) showDamageDirection(fromWorldPos);
 
   if (player.shield > 0) {
     const absorbed = Math.min(player.shield, amount);
@@ -1602,6 +1640,13 @@ function damagePlayer(amount) {
   if (amount > 0) {
     player.hp -= amount;
   }
+  // Floating taken-damage number drifting up in screen center-ish
+  const playerPos = controls.getObject().position;
+  const fwd = new THREE.Vector3();
+  camera.getWorldDirection(fwd);
+  const dropPos = playerPos.clone().add(fwd.multiplyScalar(2)).add(new THREE.Vector3(0, -0.2, 0));
+  spawnDamageNumber(dropPos, totalAmount, { taken: true });
+
   if (player.hp <= 0) {
     player.hp = 0;
     player.alive = false;
@@ -1620,11 +1665,240 @@ function updateHUDHealth() {
   shieldText.textContent = String(Math.round(player.shield));
   playerBar.style.width = `${(hp / PLAYER_MAX_HP) * 100}%`;
   enemyBar.style.width = `${Math.max(0, enemy.hp) / enemy.maxHp * 100}%`;
+  // Low-HP screen pulse
+  if (hp > 0 && hp <= 30 && player.alive) {
+    lowhpPulse.classList.add("show");
+  } else {
+    lowhpPulse.classList.remove("show");
+  }
 }
 
 function updateHUDAmmo() {
   ammoMag.textContent = String(player.mag);
   ammoReserve.textContent = String(player.reserve);
+  // Color-shift mag when low
+  if (player.mag === 0) {
+    ammoMag.style.color = "#ff3b5c";
+  } else if (player.mag <= 3) {
+    ammoMag.style.color = "#ff7e3b";
+  } else {
+    ammoMag.style.color = "#fff";
+  }
+}
+
+function updateReloadRing(now) {
+  if (player.reloading) {
+    const r = Math.max(0, Math.min(1, (now - player.reloadStart) / RELOAD_TIME));
+    reloadRing.classList.add("active");
+    reloadRingFill.style.strokeDashoffset = String(RING_CIRC * (1 - r));
+  } else {
+    reloadRing.classList.remove("active");
+    reloadRingFill.style.strokeDashoffset = String(RING_CIRC);
+  }
+}
+
+// ---------- Minimap ----------
+// Cache static features (walls/pillars) at world coords for drawing
+const mapFeatures = []; // {x, z, w, d, kind}
+function rebuildMapFeaturesCache() {
+  mapFeatures.length = 0;
+  for (const c of collidables) {
+    const size = new THREE.Vector3();
+    c.box.getSize(size);
+    const center = new THREE.Vector3();
+    c.box.getCenter(center);
+    mapFeatures.push({ x: center.x, z: center.z, w: size.x, d: size.z, kind: c.kind });
+  }
+}
+
+function drawMinimap() {
+  if (!minimapCtx) return;
+  const W = minimap.width;
+  const H = minimap.height;
+  const ctx = minimapCtx;
+  ctx.clearRect(0, 0, W, H);
+
+  // Coordinate transform: world (-ARENA_SIZE..+ARENA_SIZE) → minimap (0..W)
+  const scale = (W - 12) / (ARENA_SIZE * 2);
+  const cx = W / 2;
+  const cy = H / 2;
+  const playerWorldPos = controls.getObject().position;
+  const playerYaw = controls.getObject().rotation.y;
+
+  // Map is rotated so player always faces "up". We rotate the canvas around the player.
+  ctx.save();
+  // Move origin to player position on the map (keep player at center)
+  ctx.translate(cx, cy);
+  ctx.rotate(playerYaw);
+  ctx.translate(-playerWorldPos.x * scale, playerWorldPos.z * scale);
+
+  // Outer arena outline
+  ctx.strokeStyle = "rgba(20, 240, 255, 0.55)";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(
+    -ARENA_SIZE * scale,
+    -ARENA_SIZE * scale,
+    ARENA_SIZE * 2 * scale,
+    ARENA_SIZE * 2 * scale
+  );
+
+  // Walls / pillars / cover
+  for (const f of mapFeatures) {
+    if (f.kind === "wall") {
+      ctx.fillStyle = "rgba(120, 160, 220, 0.35)";
+    } else {
+      ctx.fillStyle = "rgba(255, 255, 255, 0.22)";
+    }
+    ctx.fillRect(
+      f.x * scale - (f.w * scale) / 2,
+      f.z * scale - (f.d * scale) / 2,
+      f.w * scale,
+      f.d * scale
+    );
+  }
+
+  // Enemy dot
+  if (!enemy.dead) {
+    const ex = enemy.group.position.x * scale;
+    const ey = enemy.group.position.z * scale;
+    // Pulsing red blip
+    const t = performance.now() / 200;
+    const r = 4 + Math.sin(t) * 1.2;
+    // Outer glow
+    const grd = ctx.createRadialGradient(ex, ey, 0, ex, ey, r * 3);
+    grd.addColorStop(0, "rgba(255, 59, 92, 0.75)");
+    grd.addColorStop(1, "rgba(255, 59, 92, 0)");
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(ex, ey, r * 3, 0, Math.PI * 2);
+    ctx.fill();
+    // Solid dot
+    ctx.fillStyle = "#ff3b5c";
+    ctx.beginPath();
+    ctx.arc(ex, ey, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+
+  // Player at center (drawn last so it's on top, NOT rotated)
+  // Triangle pointing up = direction player is facing
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = "#14f0ff";
+  ctx.shadowColor = "#14f0ff";
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.moveTo(0, -7);
+  ctx.lineTo(5, 5);
+  ctx.lineTo(-5, 5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // Field-of-view cone (player sees forward)
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = "rgba(20, 240, 255, 0.10)";
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  const fovHalf = (camera.fov * Math.PI) / 180 / 2;
+  const coneR = (W - 12) / 2;
+  ctx.arc(0, 0, coneR, -Math.PI / 2 - fovHalf, -Math.PI / 2 + fovHalf);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// ---------- Off-screen enemy arrow + distance + LOS ----------
+const _vproj = new THREE.Vector3();
+function updateEnemyArrowAndDistance() {
+  if (enemy.dead) {
+    enemyArrow.classList.add("hidden");
+    distText.textContent = "--";
+    distLos.textContent = "DOWN";
+    distLos.classList.remove("has-sight");
+    return;
+  }
+
+  const playerPos = controls.getObject().position;
+  const ePos = enemy.group.position.clone().add(new THREE.Vector3(0, 1.65, 0));
+  const dist = playerPos.distanceTo(ePos);
+  distText.textContent = dist.toFixed(1);
+
+  // LOS: do a raycast from player eye to enemy core
+  const sees = hasLineOfSight(
+    playerPos.clone(),
+    ePos
+  );
+  distLos.textContent = sees ? "IN SIGHT" : "NO SIGHT";
+  distLos.classList.toggle("has-sight", sees);
+
+  // Project enemy to NDC; if behind camera or off-screen, show arrow
+  _vproj.copy(ePos).project(camera);
+  const onScreen =
+    _vproj.z > -1 && _vproj.z < 1 &&
+    _vproj.x > -1 && _vproj.x < 1 &&
+    _vproj.y > -1 && _vproj.y < 1;
+
+  if (onScreen) {
+    enemyArrow.classList.add("hidden");
+  } else {
+    enemyArrow.classList.remove("hidden");
+    // Compute angle from screen center toward enemy (use camera-local direction)
+    const toEnemy = new THREE.Vector3().subVectors(ePos, playerPos);
+    // Build a yaw-only forward and right from camera
+    const fwd = new THREE.Vector3();
+    camera.getWorldDirection(fwd);
+    fwd.y = 0; fwd.normalize();
+    const rgt = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0));
+    const flat = toEnemy.clone(); flat.y = 0;
+    const fComp = flat.dot(fwd);
+    const rComp = flat.dot(rgt);
+    // Screen-space angle: atan2(rightComp, forwardComp). 0 = forward (up arrow), positive = clockwise.
+    const angle = Math.atan2(rComp, fComp);
+    enemyArrow.style.transform = `rotate(${angle}rad)`;
+    enemyArrowDist.textContent = `${dist.toFixed(0)}m`;
+  }
+}
+
+// ---------- Floating damage numbers ----------
+function spawnDamageNumber(worldPos, value, opts = {}) {
+  const v = _vproj.copy(worldPos).project(camera);
+  // Behind camera? skip
+  if (v.z > 1) return;
+  const x = (v.x * 0.5 + 0.5) * window.innerWidth;
+  const y = (-v.y * 0.5 + 0.5) * window.innerHeight;
+  // Off-screen? skip
+  if (x < 0 || x > window.innerWidth || y < 0 || y > window.innerHeight) return;
+  const el = document.createElement("div");
+  el.className = "dmg-num" + (opts.crit ? " crit" : "") + (opts.taken ? " taken" : "");
+  el.textContent = (opts.taken ? "-" : "") + Math.round(value);
+  el.style.left = `${x + (Math.random() - 0.5) * 20}px`;
+  el.style.top = `${y + (Math.random() - 0.5) * 10}px`;
+  damageNumbers.appendChild(el);
+  setTimeout(() => el.remove(), 1000);
+}
+
+// ---------- Directional damage indicator ----------
+function showDamageDirection(fromWorldPos) {
+  const playerPos = controls.getObject().position;
+  const fwd = new THREE.Vector3();
+  camera.getWorldDirection(fwd);
+  fwd.y = 0; fwd.normalize();
+  const rgt = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0));
+  const flat = new THREE.Vector3().subVectors(fromWorldPos, playerPos);
+  flat.y = 0;
+  const fComp = flat.dot(fwd);
+  const rComp = flat.dot(rgt);
+  // Pick the dominant direction
+  const wedge =
+    Math.abs(fComp) > Math.abs(rComp)
+      ? (fComp > 0 ? dmgUp : dmgDown)
+      : (rComp > 0 ? dmgRight : dmgLeft);
+  wedge.classList.add("show");
+  clearTimeout(wedge._t);
+  wedge._t = setTimeout(() => wedge.classList.remove("show"), 350);
 }
 
 // ---------- Camera shake ----------
@@ -1726,6 +2000,7 @@ function returnToMenu() {
 
 // ---------- Build the world once ----------
 buildArena();
+rebuildMapFeaturesCache();
 
 // ---------- UI wiring ----------
 diffBtns.forEach((b) => b.addEventListener("click", () => setDifficulty(b.dataset.diff)));
@@ -1847,6 +2122,10 @@ function update(dt, now) {
   }
 
   updateHUDHealth();
+  updateReloadRing(now);
+  updateEnemyArrowAndDistance();
+  // Minimap can be updated at lower freq for perf, but at this scale it's cheap
+  drawMinimap();
 }
 
 function render() {
