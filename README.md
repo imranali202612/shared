@@ -83,21 +83,21 @@ mkdir -p project-1
 ccr code
 ```
 
-## Repos to follow
+# 4. Repos to follow
 
-- ai-skills:
+## ai-skills:
 ```text
 AI Assisted Development with vibe-code, Spec-Driven, Spec-First, Plan-first Development
 cursor, copilot, antigravity, codex, opencode, cline, 9router etc..
 claude code mcp, hooks, plugins, subagents, skills, converting knowledge into skills, plan mode, PLAN.md, spec-kit etc..
 ```
 
-- aiops:
+## aiops:
 ```text
 Documentation for AI IDEs, CLIs, Step By Step How Tos, TODOs  &  pana  (Agent Factory: AI Book Leader Board)
 ```
 
-- devops-sre-aws:
+## devops-sre-aws:
 ```text
 Terraform/Tofu, EKS, Obserability & Security Then Convert this knowledge to AI-Skills for AWS Infrastructure to Deploy Upgraded/Updated Infra. in future.
 ```
