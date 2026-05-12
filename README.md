@@ -94,10 +94,12 @@ claude code mcp, hooks, plugins, subagents, skills, converting knowledge into sk
 
 ## aiops:
 ```text
-Documentation for AI IDEs, CLIs, Step By Step How Tos, TODOs  &  pana  (Agent Factory: AI Book Leader Board)
+Documentation for AI IDEs, CLIs, Step By Step How Tos,
+TODOs  &  pana  (Agent Factory: AI Book Leader Board)
 ```
 
 ## devops-sre-aws:
 ```text
-Terraform/Tofu, EKS, Obserability & Security Then Convert this knowledge to AI-Skills for AWS Infrastructure to Deploy Upgraded/Updated Infra. in future.
+Terraform/Tofu, EKS, Obserability & Security
+Then Convert this knowledge to AI-Skills for AWS Infrastructure to Deploy Upgraded/Updated Infra. in future.
 ```
