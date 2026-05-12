@@ -82,3 +82,8 @@ ccr start
 mkdir -p project-1
 ccr code
 ```
+
+## Repos to follow
+- aiops  (Documentation)
+- ai-skills  (AI Assisted Development with vibe-code, Spec-Driven, Spec-First, Plan-first Development)
+- devops-sre-aws (Terraform/Tofu, EKS, Obserability & Security) Convert this knowledge to AI-Skills for AWS Infrastructure to Deploy Upgraded/Updated Infra. in future.
