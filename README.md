@@ -83,19 +83,29 @@ mkdir -p project-1
 ccr code
 ```
 
-# 4. Repos to follow
+# 4. Repos to Read/Follow
 
 ## ai-skills:
 ```text
+Udemy Courses for following topics:
+
 AI Assisted Development with vibe-code, Spec-Driven, Spec-First, Plan-first Development
-cursor, copilot, antigravity, codex, opencode, cline, 9router etc..
-claude code mcp, hooks, plugins, subagents, skills, converting knowledge into skills, plan mode, PLAN.md, spec-kit etc..
+
+cursor, copilot, Antigravity, AWS Kiro, codex etc....
+
+claude code cli:
+mcp, hooks, plugins, subagents, skills, converting knowledge into skills, plan mode, PLAN.md, spec-kit etc....
+
+openclaw & AI Agents/Assistants
 ```
 
 ## aiops:
 ```text
-Documentation for AI IDEs, CLIs, Step By Step How Tos,
-TODOs  &  pana  (Agent Factory: AI Book Leader Board)
+Documentation for AI IDEs, CLIs, Step By Step How Tos, TODOs
+
+Pana Courses Dashboard:  (Agent Factory: AI Book Leader-Board)
+
+Additional AI Agents CLIs: opencode, cline, 9router, claude-code-router, claude-proxy etc....
 ```
 
 ## devops-sre-aws:
