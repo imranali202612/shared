@@ -85,9 +85,20 @@ ccr code
 
 # 4. Repos to Read/Follow
 
-## ai-skills:
+## aiops: RND Documention for AI Topics
 ```text
-Udemy Courses for following topics:
+Documentation for AI IDEs, CLIs, Step By Step How Tos, TODOs
+
+Pana Courses Dashboard:  (Agent Factory: AI Book Leader-Board)
+
+Additional AI Agents CLIs: opencode, cline, 9router, claude-code-router, claude-proxy etc....
+
+PaperClipAI: Create Company based on AI Agents/AI Assistants etc.
+```
+
+## ai-skills: Udemy Courses
+```text
+Udemy Courses for following topics and more:
 
 AI Assisted Development with vibe-code, Spec-Driven, Spec-First, Plan-first Development
 
@@ -99,17 +110,13 @@ mcp, hooks, plugins, subagents, skills, converting knowledge into skills, plan m
 openclaw & AI Agents/Assistants
 ```
 
-## aiops:
-```text
-Documentation for AI IDEs, CLIs, Step By Step How Tos, TODOs
-
-Pana Courses Dashboard:  (Agent Factory: AI Book Leader-Board)
-
-Additional AI Agents CLIs: opencode, cline, 9router, claude-code-router, claude-proxy etc....
-```
-
-## devops-sre-aws:
+## devops-sre-aws: EKS FullStack
 ```text
 Terraform/Tofu, EKS, Obserability & Security
 Then Convert this knowledge to AI-Skills for AWS Infrastructure to Deploy Upgraded/Updated Infra. in future.
 ```
+
+## Bitbucket Repos: Official
+infracode-sre: IaC (EC2 & EKS) 
+**-mia-backend:  IaC (Serverless AI Agents ) AWS Lambdas
+IDEs: cursorai, Claude Desktop, Antigravity IDE V1/V2,  AWS Kiro IDE, PaperClip Desktop, etc..
